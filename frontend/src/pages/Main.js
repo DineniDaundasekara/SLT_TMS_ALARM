@@ -128,21 +128,21 @@ const RightSide = styled(Box)({
 const Main = ({ MapComponent, RightComponent }) => {
   const services = [
     {
-      title: "Inventory Management",
+      title: "Monitoring",
       description:
-        "Track all your household items in one place, stay updated on stock levels and expiry dates.",
+        "The SLT Mobitel Alarm System provides real-time monitoring of all devices to ensure maximum security and operational efficiency.",
       icon: <InventoryIcon fontSize="large" sx={{ color: "#007BFF" }} />,
     },
     {
-      title: "Smart Grocery Lists",
+      title: "Security",
       description:
-        "Generate grocery lists automatically based on low-stock items and meal plans.",
+        "With advanced features, the system enhances security by sending instant alerts to the admin in case of any suspicious activity.",
       icon: <ShoppingCartIcon fontSize="large" sx={{ color: "#007BFF" }} />,
     },
     {
-      title: "Personalized Planning",
+      title: "Alert",
       description:
-        "Create AI-powered schedules for meals, shopping, and tasks based on your preferences.",
+        "Immediate alerts whenever an anomaly is detected, allowing quick action to resolve issues.",
       icon: <EventNoteIcon fontSize="large" sx={{ color: "#007BFF" }} />,
     },
   ];
