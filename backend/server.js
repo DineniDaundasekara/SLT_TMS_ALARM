@@ -50,10 +50,9 @@ app.use("/test", testRouter);
 
 // ---------------- 🌍 Location APIs ----------------
 
-
 const COLLECTION_NAME = process.env.COLLECTION_NAME || "CEA_LEA";
 
-// Get all locations from the new collection
+// Get all locations from the new collection, with carrier filter
 app.get("/api/locations", async (req, res) => {
   try {
     const carrier = req.query.carrier;
@@ -134,7 +133,6 @@ app.delete("/api/locations/:id", async (req, res) => {
     res.status(500).json({ error: "Failed to delete location" });
   }
 });
-
 
 // ---------------- ⚡ Utility APIs ----------------
 

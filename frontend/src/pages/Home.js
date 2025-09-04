@@ -15,9 +15,6 @@ import {
   DialogContent,
   DialogTitle,
 } from "@mui/material";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 
 // Google Maps marker icon URLs (SVG or PNG)
 const carrierIcons = {
@@ -27,6 +24,24 @@ const carrierIcons = {
   Etisalat: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
   Other: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
 };
+
+// Helper function to get marker icon URL based on CUSR_NAME keyword
+function getCarrierIconByCustomerName(customerName) {
+  if (!customerName) return carrierIcons.Other;
+  const name = customerName.toLowerCase();
+  if (name.includes("dialog")) return carrierIcons.Dialog;
+  if (name.includes("mobitel")) return carrierIcons.Mobitel;
+  if (name.includes("hutch")) return carrierIcons.Hutch;
+  if (name.includes("etisalat")) return carrierIcons.Etisalat;
+  return carrierIcons.Other;
+}
+
+const GREEN_MARKER = "http://maps.google.com/mapfiles/ms/icons/green-dot.png";
+
+// Helper function: always return green marker for filtered carriers
+function getGreenMarkerIcon() {
+  return GREEN_MARKER;
+}
 
 const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
   const mapRef = useRef(null);
@@ -62,12 +77,12 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
     return () => document.body.removeChild(script);
   }, [apiKey]);
 
-  // Fetch locations from backend
+  // Fetch locations from backend (no filter here, filter on frontend)
   useEffect(() => {
     if (!map) return;
     const loadLocations = async () => {
       try {
-        const res = await fetch(`/api/locations?carrier=${carrierFilter}`);
+        const res = await fetch(`/api/locations`);
         if (!res.ok) throw new Error("Failed to fetch locations");
         const data = await res.json();
         setLocations(data);
@@ -76,44 +91,53 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
       }
     };
     loadLocations();
-  }, [map, carrierFilter]);
+  }, [map]);
 
-  // Place markers whenever locations change
+  // Filter locations and set marker color based on dropdown
+  const filteredLocations = locations.filter((loc) => {
+    const name = (loc.customer || loc.CUSR_NAME || "").toLowerCase();
+    if (carrierFilter === "All") return true;
+    return name.includes(carrierFilter.toLowerCase());
+  });
+
+  // Place markers whenever filteredLocations change
   useEffect(() => {
     if (!map) return;
 
-    // Clear old markers
     markers.forEach((marker) => marker.setMap(null));
 
-    const newMarkers = locations
+    const newMarkers = filteredLocations
       .map((loc) => {
         const lat = loc.coordinates?.latitude;
         const lng = loc.coordinates?.longitude;
         if (!lat || !lng) return null;
 
-        // Pick icon based on carrier
-        const iconUrl = carrierIcons[loc.carrier] || carrierIcons.Other;
+        // For "All", use relevant color; for filtered, use only that color
+        let iconUrl;
+        if (carrierFilter === "All") {
+          iconUrl = getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME);
+        } else {
+          iconUrl = carrierIcons[carrierFilter] || carrierIcons.Other;
+        }
 
         const marker = new window.google.maps.Marker({
           position: { lat, lng },
           map,
           title: loc.cct || "Unknown",
           animation: window.google.maps.Animation.DROP,
-          icon: {
-            url: iconUrl,
-          },
+          icon: { url: iconUrl },
         });
 
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
-          <div style="padding:10px;">
-            <p><b>CCT:</b> ${loc.cct || "-"}</p>
-            <p><b>Service:</b> ${loc.service || "-"}</p>
-            <p><b>Customer:</b> ${loc.customer || "-"}</p>
-            <p><b>Address:</b> ${loc.address || "-"}</p>
-            <p><b>Status:</b> ${loc.status || "-"}</p>
-          </div>
-        `,
+            <div style="padding:10px;">
+              <p><b>CCT:</b> ${loc.cct || "-"}</p>
+              <p><b>Service:</b> ${loc.service || "-"}</p>
+              <p><b>Customer:</b> ${loc.customer || "-"}</p>
+              <p><b>Address:</b> ${loc.address || "-"}</p>
+              <p><b>Status:</b> ${loc.status || "-"}</p>
+            </div>
+          `,
         });
 
         marker.addListener("click", () => infoWindow.open(map, marker));
@@ -123,13 +147,12 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
 
     setMarkers(newMarkers);
 
-    // Auto fit map bounds to markers
     if (newMarkers.length > 0) {
       const bounds = new window.google.maps.LatLngBounds();
       newMarkers.forEach((m) => bounds.extend(m.getPosition()));
       map.fitBounds(bounds);
     }
-  }, [locations, map]);
+  }, [filteredLocations, map, carrierFilter]);
 
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
@@ -181,12 +204,12 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
         <Typography variant="h6" gutterBottom>
           Locations
         </Typography>
-        {locations.length === 0 ? (
+        {filteredLocations.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
             No locations found
           </Typography>
         ) : (
-          locations.map((loc, i) => (
+          filteredLocations.map((loc, i) => (
             <Box
               key={loc._id || i}
               sx={{
@@ -194,20 +217,54 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
                 mb: 1.5,
                 border: "1px solid #ddd",
                 borderRadius: 1,
+                display: "flex",
+                alignItems: "center",
               }}
             >
-              <Typography variant="subtitle1">
-                {loc.cct} - {loc.service}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {loc.customer}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {loc.address}
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Status: {loc.status}
-              </Typography>
+              {/* Show marker color dot */}
+              <Box
+                sx={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  backgroundColor:
+                    carrierFilter === "All"
+                      ? getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Dialog
+                        ? "#FFD600"
+                        : getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Mobitel
+                        ? "#BDBDBD"
+                        : getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Hutch
+                        ? "#43A047"
+                        : getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Etisalat
+                        ? "#2196F3"
+                        : "#F44336"
+                      : carrierFilter === "Dialog"
+                      ? "#FFD600"
+                      : carrierFilter === "Mobitel"
+                      ? "#BDBDBD"
+                      : carrierFilter === "Hutch"
+                      ? "#43A047"
+                      : carrierFilter === "Etisalat"
+                      ? "#2196F3"
+                      : "#F44336",
+                  mr: 1.5,
+                  border: "1px solid #ccc",
+                }}
+              />
+              <Box>
+                <Typography variant="subtitle1">
+                  {loc.cct} - {loc.service}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {loc.customer}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {loc.address}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Status: {loc.status}
+                </Typography>
+              </Box>
             </Box>
           ))
         )}
@@ -221,7 +278,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
         >
           <DialogTitle>All Location Details</DialogTitle>
           <DialogContent>
-            {locations.map((loc, index) => (
+            {filteredLocations.map((loc, index) => (
               <Box
                 key={index}
                 sx={{ mb: 2, p: 1, border: "1px solid #ddd", borderRadius: 1 }}
