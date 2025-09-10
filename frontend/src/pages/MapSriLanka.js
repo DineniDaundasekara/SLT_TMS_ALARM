@@ -166,8 +166,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
             <MenuItem value="Dialog">Dialog</MenuItem>
             <MenuItem value="Mobitel">Mobitel</MenuItem>
             <MenuItem value="Hutch">Hutch</MenuItem>
-            <MenuItem value="Etisalat">Etisalat</MenuItem>
-            <MenuItem value="Other">Other</MenuItem>
+            
           </Select>
         </FormControl>
 

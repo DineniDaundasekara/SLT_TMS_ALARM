@@ -20,9 +20,8 @@ import {
 const carrierIcons = {
   Dialog: "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png",
   Hutch: "http://maps.google.com/mapfiles/ms/icons/green-dot.png",
-  Mobitel: "http://maps.google.com/mapfiles/ms/icons/grey-dot.png",
-  Etisalat: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-  Other: "http://maps.google.com/mapfiles/ms/icons/red-dot.png",
+  Mobitel: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+  Other: "http://maps.google.com/mapfiles/ms/icons/red-dot.png", // Optional fallback for unknown
 };
 
 // Helper function to get marker icon URL based on CUSR_NAME keyword
@@ -32,15 +31,7 @@ function getCarrierIconByCustomerName(customerName) {
   if (name.includes("dialog")) return carrierIcons.Dialog;
   if (name.includes("mobitel")) return carrierIcons.Mobitel;
   if (name.includes("hutch")) return carrierIcons.Hutch;
-  if (name.includes("etisalat")) return carrierIcons.Etisalat;
-  return carrierIcons.Other;
-}
-
-const GREEN_MARKER = "http://maps.google.com/mapfiles/ms/icons/green-dot.png";
-
-// Helper function: always return green marker for filtered carriers
-function getGreenMarkerIcon() {
-  return GREEN_MARKER;
+  return carrierIcons.Other; // Default for unrecognized carrier names
 }
 
 const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
@@ -117,6 +108,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
         if (carrierFilter === "All") {
           iconUrl = getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME);
         } else {
+          // If a specific filter is applied, use only the selected carrier's icon
           iconUrl = carrierIcons[carrierFilter] || carrierIcons.Other;
         }
 
@@ -157,10 +149,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
       {/* Map */}
-      <Box
-        ref={mapRef}
-        sx={{ flex: 2, borderRadius: 2, overflow: "hidden" }}
-      />
+      <Box ref={mapRef} sx={{ flex: 2, borderRadius: 2, overflow: "hidden" }} />
 
       {/* Sidebar */}
       <Box
@@ -185,9 +174,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
             <MenuItem value="All">All</MenuItem>
             <MenuItem value="Dialog">Dialog</MenuItem>
             <MenuItem value="Mobitel">Mobitel</MenuItem>
-            <MenuItem value="Etisalat">Etisalat</MenuItem>
             <MenuItem value="Hutch">Hutch</MenuItem>
-            <MenuItem value="Other">Other</MenuItem>
           </Select>
         </FormControl>
 
@@ -232,20 +219,16 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
                       ? getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Dialog
                         ? "#FFD600"
                         : getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Mobitel
-                        ? "#BDBDBD"
+                        ? "#2196F3"
                         : getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Hutch
                         ? "#43A047"
-                        : getCarrierIconByCustomerName(loc.customer || loc.CUSR_NAME) === carrierIcons.Etisalat
-                        ? "#2196F3"
                         : "#F44336"
                       : carrierFilter === "Dialog"
                       ? "#FFD600"
                       : carrierFilter === "Mobitel"
-                      ? "#BDBDBD"
+                      ? "#2196F3"
                       : carrierFilter === "Hutch"
                       ? "#43A047"
-                      : carrierFilter === "Etisalat"
-                      ? "#2196F3"
                       : "#F44336",
                   mr: 1.5,
                   border: "1px solid #ccc",
