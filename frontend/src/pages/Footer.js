@@ -70,15 +70,17 @@ const Footer = () => {
               CONTACT
             </Typography>
             <Typography variant="body2" color="textSecondary">
-             Industrial Zone, 
-            Colombo 05,Colombo,,00500,
+            Hotline(24X7) <br/>
+            Dial 1212 ( Toll-free) or +94 (0) 712755777<br/>
+            IVR based self service : +94(0) 112 12 12 12<br/>
             Sri Lanka,
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ marginTop: '10px' }}>
-              +91-8888888888
+              Lotus Road,
+              Colombo 01.<br/><br/>
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              websupport@justdial.com
+              1212@slt.com.lk
             </Typography>
           </Grid>
         </Grid>
