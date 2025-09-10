@@ -70,6 +70,7 @@ const Footer = () => {
               CONTACT
             </Typography>
             <Typography variant="body2" color="textSecondary">
+
              Lotus Road,
              Colombo 01,
              Sri Lanka,
@@ -81,6 +82,7 @@ const Footer = () => {
             </Typography>
             <Typography variant="body2" color="textSecondary">
              1212@slt.com.lk
+
             </Typography>
           </Grid>
         </Grid>
