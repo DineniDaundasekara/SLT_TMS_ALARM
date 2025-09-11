@@ -133,12 +133,22 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
 
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
-            <div style="padding:10px;">
-              <p><b>CCT:</b> ${loc.cct || "-"}</p>
-              <p><b>Service:</b> ${loc.service || "-"}</p>
-              <p><b>Customer:</b> ${loc.customer || "-"}</p>
-              <p><b>Address:</b> ${loc.address || "-"}</p>
-              <p><b>Status:</b> ${loc.status || "-"}</p>
+            <div style="padding:10px; font-family: Arial, sans-serif; max-width: 300px; color: #000000; background-color: #ffffff;">
+              <h3 style="margin: 0 0 10px 0; color: #1976d2; border-bottom: 2px solid #1976d2; padding-bottom: 5px;">Equipment Details</h3>
+              <p style="margin: 5px 0; color: #000000;"><b>CCT:</b> ${loc.cct || "-"}</p>
+              <p style="margin: 5px 0; color: #000000;"><b>Service:</b> ${loc.service || "-"}</p>
+              <p style="margin: 5px 0; color: #000000;"><b>Customer:</b> ${loc.customer || "-"}</p>
+              <p style="margin: 5px 0; color: #000000;"><b>Address:</b> ${loc.address || "-"}</p>
+              <p style="margin: 5px 0; color: #000000;"><b>Status:</b> ${loc.status || "-"}</p>
+              <hr style="margin: 10px 0; border: 1px solid #ddd;">
+              <h4 style="margin: 10px 0 5px 0; color: #1976d2;">Equipment Information</h4>
+              <p style="margin: 5px 0; color: #000000;"><b>BENDADDRESS:</b> ${loc.bendAddress || "-"}</p>
+              <p style="margin: 5px 0; color: #000000;"><b>EQUP_INDEX:</b> ${loc.equpIndex || "-"}</p>
+              <p style="margin: 5px 0; color: #000000;"><b>EQ_LOCATION_NODE:</b> ${loc.eqLocationNode || "-"}</p>
+              <hr style="margin: 10px 0; border: 1px solid #ddd;">
+              <h4 style="margin: 10px 0 5px 0; color: #1976d2;">Coordinates</h4>
+              <p style="margin: 5px 0; color: #000000;"><b>Latitude:</b> ${loc.coordinates?.latitude?.toFixed(6) || "-"}</p>
+              <p style="margin: 5px 0; color: #000000;"><b>Longitude:</b> ${loc.coordinates?.longitude?.toFixed(6) || "-"}</p>
             </div>
           `,
         });
@@ -254,6 +264,12 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
                   <Typography variant="caption" color="text.secondary">
                     Status: {loc.status}
                   </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    EQUP_INDEX: {loc.equpIndex || "-"}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    EQ_LOCATION_NODE: {loc.eqLocationNode || "-"}
+                  </Typography>
                 </Box>
               </Box>
             );
@@ -293,6 +309,18 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Status: {loc.status}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  BENDADDRESS: {loc.bendAddress || "-"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  EQUP_INDEX: {loc.equpIndex || "-"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  EQ_LOCATION_NODE: {loc.eqLocationNode || "-"}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Coordinates: {loc.coordinates?.latitude?.toFixed(6)}, {loc.coordinates?.longitude?.toFixed(6)}
                 </Typography>
               </Box>
             ))}

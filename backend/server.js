@@ -99,6 +99,10 @@ app.get("/api/locations", async (req, res) => {
           status: doc.CIRT_STATUS ?? "",
           coordinates: { latitude: lat, longitude: lng },
           carrier: detectedCarrier,
+          // Additional equipment details
+          bendAddress: doc.BENDADDRESS ?? "",
+          equpIndex: doc.EQUP_INDEX ?? "",
+          eqLocationNode: doc.EQ_LOCATION_NODE ?? "",
         };
       })
       .filter(
