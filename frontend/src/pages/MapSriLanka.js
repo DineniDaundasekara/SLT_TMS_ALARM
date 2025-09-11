@@ -13,11 +13,11 @@ import {
   DialogTitle,
 } from "@mui/material";
 
-// Helper to infer carrier label from CUSR_NAME
+// Helper function to infer carrier name from customer name
 function getCarrierByCustomerName(customerName) {
   if (!customerName) return "Other";
   const raw = String(customerName).toLowerCase();
-  const name = raw.replace(/\s|\-/g, ""); // normalize spaces/dashes
+  const name = raw.replace(/\s|\-/g, ""); // Remove spaces and dashes
   if (name.includes("dialog")) return "Dialog";
   if (name.includes("sltmobitel") || name.includes("mobitel")) return "Mobitel";
   if (name.includes("hutchison") || name.includes("hutch")) return "Hutch";
@@ -25,22 +25,23 @@ function getCarrierByCustomerName(customerName) {
   return "Other";
 }
 
+// Main MapSriLanka component
 const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
-  const mapRef = useRef(null);
-  const [apiKey, setApiKey] = useState("");
-  const [map, setMap] = useState(null);
-  const [locations, setLocations] = useState([]);
-  const [markers, setMarkers] = useState([]);
-  const [openDetails, setOpenDetails] = useState(false);
+  const mapRef = useRef(null); // Reference to the map DOM element
+  const [apiKey, setApiKey] = useState(""); // Google Maps API key
+  const [map, setMap] = useState(null); // Google Maps instance
+  const [locations, setLocations] = useState([]); // All location data
+  const [markers, setMarkers] = useState([]); // Google Maps markers
+  const [openDetails, setOpenDetails] = useState(false); // Dialog open state
 
-  // Fetch API key from backend
+  // Fetch Google Maps API key from backend on mount
   useEffect(() => {
     fetch("/api/config")
       .then((res) => res.json())
       .then((data) => setApiKey(data.googleMapsApiKey));
   }, []);
 
-  // Initialize Google Maps
+  // Load Google Maps script and initialize map when API key is available
   useEffect(() => {
     if (!apiKey) return;
     const script = document.createElement("script");
@@ -48,18 +49,20 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
     script.async = true;
     script.onload = () => {
       if (window.google) {
+        // Create map centered on Sri Lanka
         const m = new window.google.maps.Map(mapRef.current, {
-          center: { lat: 7.8731, lng: 80.7718 }, // Sri Lanka
+          center: { lat: 7.8731, lng: 80.7718 },
           zoom: 7,
         });
         setMap(m);
       }
     };
     document.body.appendChild(script);
+    // Cleanup script on unmount
     return () => document.body.removeChild(script);
   }, [apiKey]);
 
-  // Fetch all locations once; filter on frontend by CUSR_NAME
+  // Fetch all locations from backend when map is ready
   useEffect(() => {
     if (!map) return;
     const loadLocations = async () => {
@@ -67,7 +70,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
         const res = await fetch(`/api/locations`);
         if (!res.ok) throw new Error("Failed to fetch locations");
         const data = await res.json();
-        setLocations(data);
+        setLocations(data); // Store locations in state
       } catch (err) {
         console.error(err);
       }
@@ -75,14 +78,14 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
     loadLocations();
   }, [map]);
 
-  // Filter locations based on dropdown and CUSR_NAME
+  // Filter locations based on selected carrier
   const filteredLocations = locations.filter((loc) => {
     if (carrierFilter === "All") return true;
     const inferred = getCarrierByCustomerName(loc.CUSR_NAME || loc.customer);
     return inferred === carrierFilter;
   });
 
-  // Map color dots + marker fill colors
+  // Return color hex code for each carrier
   const colorHexByCarrier = (carrier) => {
     switch (carrier) {
       case "Dialog":
@@ -98,24 +101,26 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
     }
   };
 
-  // Place markers whenever filteredLocations or filter changes
+  // Place markers on the map for filtered locations
   useEffect(() => {
     if (!map) return;
 
-    // Clear old markers
+    // Remove old markers from map
     markers.forEach((marker) => marker.setMap(null));
 
+    // Create new markers for each filtered location
     const newMarkers = filteredLocations
       .map((loc) => {
         const lat = loc.coordinates?.latitude;
         const lng = loc.coordinates?.longitude;
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-        // Decide marker color using vector symbol (no external images)
+        // Determine marker color based on carrier
         const inferred = getCarrierByCustomerName(loc.CUSR_NAME || loc.customer);
         const markerCarrier = carrierFilter === "All" ? inferred : carrierFilter;
         const fill = colorHexByCarrier(markerCarrier);
 
+        // Create Google Maps marker
         const marker = new window.google.maps.Marker({
           position: { lat, lng },
           map,
@@ -131,6 +136,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           },
         });
 
+        // Info window for marker
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
             <div style="padding:10px;">
@@ -143,13 +149,15 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           `,
         });
 
+        // Show info window on marker click
         marker.addListener("click", () => infoWindow.open(map, marker));
         return marker;
       })
-      .filter(Boolean);
+      .filter(Boolean); // Remove nulls
 
-    setMarkers(newMarkers);
+    setMarkers(newMarkers); // Update markers state
 
+    // Adjust map bounds to fit all markers
     if (newMarkers.length > 0) {
       const bounds = new window.google.maps.LatLngBounds();
       newMarkers.forEach((m) => bounds.extend(m.getPosition()));
@@ -159,13 +167,13 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
 
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
-      {/* Map */}
+      {/* Map container */}
       <Box
         ref={mapRef}
         sx={{ flex: 2, borderRadius: 2, overflow: "hidden" }}
       />
 
-      {/* Sidebar */}
+      {/* Sidebar with controls and location list */}
       <Box
         sx={{
           flex: 1,
@@ -177,7 +185,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           overflowY: "auto",
         }}
       >
-        {/* Carrier Filter */}
+        {/* Carrier filter dropdown */}
         <FormControl size="small" fullWidth sx={{ mb: 2 }}>
           <InputLabel id="carrier-filter-label">Filter by Carrier</InputLabel>
           <Select
@@ -191,10 +199,10 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
             <MenuItem value="Mobitel">Mobitel</MenuItem>
             <MenuItem value="Hutch">Hutch</MenuItem>
             <MenuItem value="Etisalat">Etisalat</MenuItem>
-            
           </Select>
         </FormControl>
 
+        {/* Button to open details dialog */}
         <Button
           variant="contained"
           onClick={() => setOpenDetails(true)}
@@ -203,7 +211,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           View Alarm Location Details
         </Button>
 
-        {/* Location list */}
+        {/* List of filtered locations */}
         <Typography variant="h6" gutterBottom>
           Locations
         </Typography>
@@ -230,7 +238,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
                   alignItems: "center",
                 }}
               >
-                {/* Color dot matching marker */}
+                {/* Color dot for carrier */}
                 <Box
                   sx={{
                     width: 16,
@@ -260,14 +268,14 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           })
         )}
 
-        {/* Quick carrier counts (debug/visibility) */}
+        {/* Quick carrier counts for summary */}
         <Box sx={{ mt: 1, mb: 2 }}>
           <Typography variant="caption" color="text.secondary">
             Total: {locations.length} | Dialog: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Dialog').length} | Mobitel: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Mobitel').length} | Hutch: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Hutch').length} | Other: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Other').length}
           </Typography>
         </Box>
 
-        {/* Dialog to View All Location Details */}
+        {/* Dialog to show all location details */}
         <Dialog
           open={openDetails}
           onClose={() => setOpenDetails(false)}
