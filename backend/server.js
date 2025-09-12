@@ -56,32 +56,32 @@ const COLLECTION_NAME = process.env.COLLECTION_NAME || "CEA_LEA";
 app.get("/api/locations", async (req, res) => {
   try {
     const carrier = req.query.carrier;
-    const rawDocs = await mongoose.connection.db
-      .collection(COLLECTION_NAME)
-      .find({})
-      .toArray();
+    const { north, south, east, west } = req.query;
+
+    const collection = mongoose.connection.db.collection(COLLECTION_NAME);
+
+    // Build query
+    const query = {};
+
+    // ✅ Filter by map bounds if provided
+    if (north && south && east && west) {
+      query.$or = [
+        {
+          "CEA Node- latitude": { $gte: parseFloat(south), $lte: parseFloat(north) },
+          "CEA Node- longitude": { $gte: parseFloat(west), $lte: parseFloat(east) },
+        },
+        {
+          latitude: { $gte: parseFloat(south), $lte: parseFloat(north) },
+          longitude: { $gte: parseFloat(west), $lte: parseFloat(east) },
+        },
+      ];
+    }
+
+    const rawDocs = await collection.find(query).toArray();
 
     const locations = rawDocs
       .map((doc) => {
-        const rawLat =
-          doc["CEA Node- latitude"] ??
-          doc["CEA Node - latitude"] ??
-          doc.latitude;
-        const rawLng =
-          doc["CEA Node- longitude"] ??
-          doc["CEA Node - longitude"] ??
-          doc.longitude;
-
-        const lat =
-          typeof rawLat === "number"
-            ? rawLat
-            : parseFloat(rawLat || "NaN");
-        const lng =
-          typeof rawLng === "number"
-            ? rawLng
-            : parseFloat(rawLng || "NaN");
-
-        // Carrier detection from CUSR_NAME
+        // Carrier detection
         let detectedCarrier = "";
         const cusrName = (doc.CUSR_NAME || "").toLowerCase();
         if (cusrName.includes("dialog")) detectedCarrier = "Dialog";
@@ -97,17 +97,28 @@ app.get("/api/locations", async (req, res) => {
           customer: doc.CUSR_NAME ?? "",
           address: doc.BENDADDRESS ?? "",
           status: doc.CIRT_STATUS ?? "",
-          coordinates: { latitude: lat, longitude: lng },
+          leaCoordinates: {
+            latitude: parseFloat(doc["CEA Node- latitude"]),
+            longitude: parseFloat(doc["CEA Node- longitude"]),
+          },
+          cctCoordinates: {
+            latitude: parseFloat(doc.latitude),
+            longitude: parseFloat(doc.longitude),
+          },
           carrier: detectedCarrier,
         };
       })
-      .filter(  
-        (d) =>
-          Number.isFinite(d.coordinates.latitude) &&
-          Number.isFinite(d.coordinates.longitude) &&
-          (!carrier || carrier === "All" || d.carrier === carrier)
-      );
-      
+      .filter((d) => {
+        const hasLea =
+          Number.isFinite(d.leaCoordinates?.latitude) &&
+          Number.isFinite(d.leaCoordinates?.longitude);
+        const hasCct =
+          Number.isFinite(d.cctCoordinates?.latitude) &&
+          Number.isFinite(d.cctCoordinates?.longitude);
+
+        return (hasLea || hasCct) && (!carrier || carrier === "All" || d.carrier === carrier);
+      });
+
     res.json(locations);
   } catch (error) {
     console.error("❌ Error fetching locations:", error);
