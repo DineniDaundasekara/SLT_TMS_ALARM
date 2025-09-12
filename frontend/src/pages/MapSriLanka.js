@@ -1,17 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Box,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Typography,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-} from "@mui/material";
+import { Box, Typography, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
 import { MarkerClusterer } from "@googlemaps/markerclusterer";
 
 // Helper: detect carrier name
@@ -26,23 +14,10 @@ function getCarrierByCustomerName(customerName) {
   return "Other";
 }
 
-// Carrier colors
-const colorHexByCarrier = (carrier) => {
-  switch (carrier) {
-    case "Dialog":
-      return "#FFD600"; // yellow
-    case "Mobitel":
-      return "#2196F3"; // blue
-    case "Hutch":
-      return "#43A047"; // green
-    case "Etisalat":
-      return "#2196F3"; // blue
-    default:
-      return "#F44336"; // red
-  }
-};
+// Carrier colors (unified)
+const colorHexByCarrier = () => "#2f4f4f";
 
-const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
+const MapSriLanka = () => {
   const mapRef = useRef(null);
   const [apiKey, setApiKey] = useState("");
   const [map, setMap] = useState(null);
@@ -92,7 +67,6 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           south: southWest.lat(),
           east: northEast.lng(),
           west: southWest.lng(),
-          carrier: carrierFilter,
         });
 
         const res = await fetch(`/api/locations?${query.toString()}`);
@@ -112,7 +86,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
     return () => {
       if (listener) window.google.maps.event.removeListener(listener);
     };
-  }, [map, carrierFilter]);
+  }, [map]);
 
   // ✅ Place clustered markers
   useEffect(() => {
@@ -210,7 +184,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
       renderer: {
         render: ({ count, markers: clusterMarkers, position }) => {
           let hasCCT = false;
-          let clusterColor = "#F44336"; // fallback red
+          let clusterColor = "#2f4f4f"; // default to LEA/CEA color
 
           for (const m of clusterMarkers) {
             if (m.isCCT) {
@@ -264,21 +238,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           overflowY: "auto",
         }}
       >
-        <FormControl size="small" fullWidth sx={{ mb: 2 }}>
-          <InputLabel id="carrier-filter-label">Filter by Carrier</InputLabel>
-          <Select
-            labelId="carrier-filter-label"
-            value={carrierFilter}
-            onChange={(e) => setCarrierFilter(e.target.value)}
-            label="Filter by Carrier"
-          >
-            <MenuItem value="All">All</MenuItem>
-            <MenuItem value="Dialog">Dialog</MenuItem>
-            <MenuItem value="Mobitel">Mobitel</MenuItem>
-            <MenuItem value="Hutch">Hutch</MenuItem>
-            <MenuItem value="Etisalat">Etisalat</MenuItem>
-          </Select>
-        </FormControl>
+        {/* Filter removed as all carriers use same color */}
 
         <Button
           variant="contained"

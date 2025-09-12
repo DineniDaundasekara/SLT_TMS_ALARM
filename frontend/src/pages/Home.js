@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import Main from "./Main";
 import Footer from "./Footer";
 import UNavbar from "./UNavbar";
@@ -7,7 +7,7 @@ import MapSriLanka from "./MapSriLanka";
 
 // ----------------- Main Home Component -----------------
 const Home = () => {
-  const [carrierFilter, setCarrierFilter] = useState("All");
+  
 
   return (
     <Box
@@ -20,14 +20,7 @@ const Home = () => {
     >
       <UNavbar />
       <Box sx={{ flex: 1 }}>
-        <Main
-          MapComponent={() => (
-            <MapSriLanka
-              carrierFilter={carrierFilter}
-              setCarrierFilter={setCarrierFilter}
-            />
-          )}
-        />
+        <Main MapComponent={() => <MapSriLanka />} />
       </Box>
       <Footer />
     </Box>
