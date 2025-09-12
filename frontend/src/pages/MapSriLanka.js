@@ -106,54 +106,73 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
 
     // Initial load
     loadLocations();
-  }, [map]);
 
-  // Filter locations based on dropdown and CUSR_NAME
-  const filteredLocations = locations.filter((loc) => {
-    if (carrierFilter === "All") return true;
-    const inferred = getCarrierByCustomerName(loc.CUSR_NAME || loc.customer);
-    return inferred === carrierFilter;
-  });
+    // Reload when map moves
+    const listener = map.addListener("idle", loadLocations);
+    return () => {
+      if (listener) window.google.maps.event.removeListener(listener);
+    };
+  }, [map, carrierFilter]);
 
-  // Map color dots + marker fill colors
-  const colorHexByCarrier = (carrier) => {
-    switch (carrier) {
-      case "Dialog":
-        return "#FFD600"; // yellow
-      case "Mobitel":
-        return "#2196F3"; // blue
-      case "Hutch":
-        return "#43A047"; // green
-      case "Etisalat":
-        return "#2196F3"; // blue
-      default:
-        return "#F44336"; // red
-    }
-  };
-
-  // Place markers whenever filteredLocations or filter changes
+  // ✅ Place clustered markers
   useEffect(() => {
-    if (!map) return;
+    if (!map || locations.length === 0) return;
 
-    // Clear old markers
-    markers.forEach((marker) => marker.setMap(null));
+    const markers = [];
 
-    const newMarkers = filteredLocations
-      .map((loc) => {
-        const lat = loc.coordinates?.latitude;
-        const lng = loc.coordinates?.longitude;
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    locations.forEach((loc) => {
+      // LEA marker
+      if (
+        Number.isFinite(loc.leaCoordinates?.latitude) &&
+        Number.isFinite(loc.leaCoordinates?.longitude)
+      ) {
+        const fillColor = colorHexByCarrier(loc.carrier);
+        const leaMarker = new window.google.maps.Marker({
+          position: {
+            lat: loc.leaCoordinates.latitude,
+            lng: loc.leaCoordinates.longitude,
+          },
+          title: `LEA - ${loc.cct || "Unknown"}`,
+          icon: {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 6,
+            fillColor,
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 1,
+          },
+        });
 
-        // Decide marker color using vector symbol (no external images)
-        const inferred = getCarrierByCustomerName(loc.CUSR_NAME || loc.customer);
-        const markerCarrier = carrierFilter === "All" ? inferred : carrierFilter;
-        const fill = colorHexByCarrier(markerCarrier);
+        const infoWindow = new window.google.maps.InfoWindow({
+          content: `
+            <div style="padding:10px;">
+              <p><b>LEA Location</b></p>
+              <p><b>CCT:</b> ${loc.cct || "-"}</p>
+              <p><b>Service:</b> ${loc.service || "-"}</p>
+              <p><b>Customer:</b> ${loc.customer || "-"}</p>
+              <p><b>Address:</b> ${loc.address || "-"}</p>
+              <p><b>Status:</b> ${loc.status || "-"}</p>
+            </div>
+          `,
+        });
+        leaMarker.addListener("click", () => infoWindow.open(map, leaMarker));
 
-        const marker = new window.google.maps.Marker({
-          position: { lat, lng },
-          map,
-          title: loc.cct || "Unknown",
-          animation: window.google.maps.Animation.DROP,
+        // Save carrier color for cluster renderer
+        leaMarker.carrierColor = fillColor;
+        markers.push(leaMarker);
+      }
+
+      // CCT marker
+      if (
+        Number.isFinite(loc.cctCoordinates?.latitude) &&
+        Number.isFinite(loc.cctCoordinates?.longitude)
+      ) {
+        const cctMarker = new window.google.maps.Marker({
+          position: {
+            lat: loc.cctCoordinates.latitude,
+            lng: loc.cctCoordinates.longitude,
+          },
+          title: `CCT - ${loc.cct || "Unknown"}`,
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             scale: 6,
@@ -167,6 +186,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
             <div style="padding:10px;">
+              <p><b>CCT Location</b></p>
               <p><b>CCT:</b> ${loc.cct || "-"}</p>
               <p><b>Service:</b> ${loc.service || "-"}</p>
               <p><b>Customer:</b> ${loc.customer || "-"}</p>
@@ -175,20 +195,57 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
             </div>
           `,
         });
+        cctMarker.addListener("click", () => infoWindow.open(map, cctMarker));
 
-        marker.addListener("click", () => infoWindow.open(map, marker));
-        return marker;
-      })
-      .filter(Boolean);
+        // Save marker type for cluster renderer
+        cctMarker.isCCT = true;
+        markers.push(cctMarker);
+      }
+    });
 
-    setMarkers(newMarkers);
+    // ✅ Custom cluster renderer
+    new MarkerClusterer({
+      map,
+      markers,
+      renderer: {
+        render: ({ count, markers: clusterMarkers, position }) => {
+          let hasCCT = false;
+          let clusterColor = "#F44336"; // fallback red
 
-    if (newMarkers.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      newMarkers.forEach((m) => bounds.extend(m.getPosition()));
-      map.fitBounds(bounds);
-    }
-  }, [locations, map, carrierFilter]);
+          for (const m of clusterMarkers) {
+            if (m.isCCT) {
+              hasCCT = true;
+              break;
+            } else if (m.carrierColor) {
+              clusterColor = m.carrierColor;
+            }
+          }
+
+          // If any CCT marker inside → purple cluster
+          if (hasCCT) clusterColor = "#800080";
+
+          return new window.google.maps.Marker({
+            position,
+            icon: {
+              path: window.google.maps.SymbolPath.CIRCLE,
+              fillColor: clusterColor,
+              fillOpacity: 0.7,
+              strokeColor: "#fff",
+              strokeWeight: 1,
+              scale: Math.max(20, Math.min(count / 2, 40)),
+              labelOrigin: new window.google.maps.Point(0, 0),
+            },
+            label: {
+              text: String(count),
+              color: "white",
+              fontSize: "12px",
+              fontWeight: "bold",
+            },
+          });
+        },
+      },
+    });
+  }, [map, locations]);
 
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
@@ -207,7 +264,6 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
           overflowY: "auto",
         }}
       >
-        {/* Carrier Filter */}
         <FormControl size="small" fullWidth sx={{ mb: 2 }}>
           <InputLabel id="carrier-filter-label">Filter by Carrier</InputLabel>
           <Select
@@ -221,7 +277,6 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
             <MenuItem value="Mobitel">Mobitel</MenuItem>
             <MenuItem value="Hutch">Hutch</MenuItem>
             <MenuItem value="Etisalat">Etisalat</MenuItem>
-            
           </Select>
         </FormControl>
 
@@ -242,62 +297,46 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
             No locations found in this area
           </Typography>
         ) : (
-          filteredLocations.map((loc, i) => {
-            const perCarrier =
-              carrierFilter === "All"
-                ? getCarrierByCustomerName(loc.CUSR_NAME || loc.customer)
-                : carrierFilter;
-
-            return (
+          locations.map((loc, i) => (
+            <Box
+              key={loc._id || i}
+              sx={{
+                p: 1.5,
+                mb: 1.5,
+                border: "1px solid #ddd",
+                borderRadius: 1,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
               <Box
-                key={loc._id || i}
                 sx={{
-                  p: 1.5,
-                  mb: 1.5,
-                  border: "1px solid #ddd",
-                  borderRadius: 1,
-                  display: "flex",
-                  alignItems: "center",
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  backgroundColor: colorHexByCarrier(loc.carrier),
+                  mr: 1.5,
+                  border: "1px solid #ccc",
                 }}
-              >
-                {/* Color dot matching marker */}
-                <Box
-                  sx={{
-                    width: 16,
-                    height: 16,
-                    borderRadius: "50%",
-                    backgroundColor: colorHexByCarrier(perCarrier),
-                    mr: 1.5,
-                    border: "1px solid #ccc",
-                  }}
-                />
-                <Box>
-                  <Typography variant="subtitle1">
-                    {loc.cct} - {loc.service}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {loc.customer}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {loc.address}
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary">
-                    Status: {loc.status}
-                  </Typography>
-                </Box>
+              />
+              <Box>
+                <Typography variant="subtitle1">
+                  {loc.cct} - {loc.service}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {loc.customer}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {loc.address}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Status: {loc.status}
+                </Typography>
               </Box>
-            );
-          })
+            </Box>
+          ))
         )}
 
-        {/* Quick carrier counts (debug/visibility) */}
-        <Box sx={{ mt: 1, mb: 2 }}>
-          <Typography variant="caption" color="text.secondary">
-            Total: {locations.length} | Dialog: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Dialog').length} | Mobitel: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Mobitel').length} | Hutch: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Hutch').length} | Other: {locations.filter(l => getCarrierByCustomerName(l.CUSR_NAME || l.customer) === 'Other').length}
-          </Typography>
-        </Box>
-
-        {/* Dialog to View All Location Details */}
         <Dialog
           open={openDetails}
           onClose={() => setOpenDetails(false)}
@@ -309,7 +348,7 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
             {locations.map((loc, index) => (
               <Box
                 key={index}
-                sx={{ mb: 2, p: 1, border: "1px solid #c34040ff", borderRadius: 1 }}
+                sx={{ mb: 2, p: 1, border: "1px solid #ddd", borderRadius: 1 }}
               >
                 <Typography variant="h6">{loc.cct}</Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -323,18 +362,6 @@ const MapSriLanka = ({ carrierFilter, setCarrierFilter }) => {
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
                   Status: {loc.status}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  BENDADDRESS: {loc.bendAddress || "-"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  EQUP_INDEX: {loc.equpIndex || "-"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  EQ_LOCATION_NODE: {loc.eqLocationNode || "-"}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Coordinates: {loc.coordinates?.latitude?.toFixed(6)}, {loc.coordinates?.longitude?.toFixed(6)}
                 </Typography>
               </Box>
             ))}
