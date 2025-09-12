@@ -106,6 +106,10 @@ app.get("/api/locations", async (req, res) => {
             longitude: parseFloat(doc.longitude),
           },
           carrier: detectedCarrier,
+          // Additional equipment details
+          bendAddress: doc.BENDADDRESS ?? "",
+          equpIndex: doc.EQUP_INDEX ?? "",
+          eqLocationNode: doc.EQ_LOCATION_NODE ?? "",
         };
       })
       .filter((d) => {
