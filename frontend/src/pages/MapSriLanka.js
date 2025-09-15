@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Typography, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
-import { MarkerClusterer } from "@googlemaps/markerclusterer";
 
 // Helper: detect carrier name
 function getCarrierByCustomerName(customerName) {
@@ -88,11 +87,13 @@ const MapSriLanka = () => {
     };
   }, [map]);
 
-  // ✅ Place clustered markers
+  // ✅ Place individual markers (no clustering)
   useEffect(() => {
     if (!map || locations.length === 0) return;
 
-    const markers = [];
+    // Clear existing markers
+    map.markers?.forEach((m) => m.setMap(null));
+    map.markers = [];
 
     locations.forEach((loc) => {
       // LEA marker
@@ -106,6 +107,7 @@ const MapSriLanka = () => {
             lat: loc.leaCoordinates.latitude,
             lng: loc.leaCoordinates.longitude,
           },
+          map,
           title: `LEA - ${loc.cct || "Unknown"}`,
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
@@ -130,10 +132,7 @@ const MapSriLanka = () => {
           `,
         });
         leaMarker.addListener("click", () => infoWindow.open(map, leaMarker));
-
-        // Save carrier color for cluster renderer
-        leaMarker.carrierColor = fillColor;
-        markers.push(leaMarker);
+        map.markers.push(leaMarker);
       }
 
       // CCT marker
@@ -146,6 +145,7 @@ const MapSriLanka = () => {
             lat: loc.cctCoordinates.latitude,
             lng: loc.cctCoordinates.longitude,
           },
+          map,
           title: `CCT - ${loc.cct || "Unknown"}`,
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
@@ -170,54 +170,8 @@ const MapSriLanka = () => {
           `,
         });
         cctMarker.addListener("click", () => infoWindow.open(map, cctMarker));
-
-        // Save marker type for cluster renderer
-        cctMarker.isCCT = true;
-        markers.push(cctMarker);
+        map.markers.push(cctMarker);
       }
-    });
-
-    // ✅ Custom cluster renderer
-    new MarkerClusterer({
-      map,
-      markers,
-      renderer: {
-        render: ({ count, markers: clusterMarkers, position }) => {
-          let hasCCT = false;
-          let clusterColor = "#2f4f4f"; // default to LEA/CEA color
-
-          for (const m of clusterMarkers) {
-            if (m.isCCT) {
-              hasCCT = true;
-              break;
-            } else if (m.carrierColor) {
-              clusterColor = m.carrierColor;
-            }
-          }
-
-          // If any CCT marker inside → purple cluster
-          if (hasCCT) clusterColor = "#800080";
-
-          return new window.google.maps.Marker({
-            position,
-            icon: {
-              path: window.google.maps.SymbolPath.CIRCLE,
-              fillColor: clusterColor,
-              fillOpacity: 0.7,
-              strokeColor: "#fff",
-              strokeWeight: 1,
-              scale: Math.max(20, Math.min(count / 2, 40)),
-              labelOrigin: new window.google.maps.Point(0, 0),
-            },
-            label: {
-              text: String(count),
-              color: "white",
-              fontSize: "12px",
-              fontWeight: "bold",
-            },
-          });
-        },
-      },
     });
   }, [map, locations]);
 
