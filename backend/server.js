@@ -50,7 +50,8 @@ app.use("/test", testRouter);
 
 // ---------------- 🌍 Location APIs ----------------
 
-const COLLECTION_NAME = process.env.COLLECTION_NAME || "CEA_LEA";
+const COLLECTION_NAME = process.env.COLLECTION_NAME || "TMS";
+const MAX_LOCATIONS = 500; // Set your preferred limit
 
 // Get all locations from the new collection, with carrier filter
 app.get("/api/locations", async (req, res) => {
@@ -77,17 +78,19 @@ app.get("/api/locations", async (req, res) => {
       ];
     }
 
-    const rawDocs = await collection.find(query).toArray();
+    // Fetch docs in bounds, limit results
+    const rawDocs = await collection.find(query).limit(MAX_LOCATIONS).toArray();
 
+    // Carrier filter logic
     const locations = rawDocs
-      .map((doc) => {
-        // Carrier detection
+        .map((doc) => {
+        // Carrier detection (match frontend logic)
         let detectedCarrier = "";
-        const cusrName = (doc.CUSR_NAME || "").toLowerCase();
+        const cusrName = (doc.CUSR_NAME || "").toLowerCase().replace(/\s|-/g, "");
         if (cusrName.includes("dialog")) detectedCarrier = "Dialog";
-        else if (cusrName.includes("mobitel")) detectedCarrier = "Mobitel";
+        else if (cusrName.includes("sltmobitel") || cusrName.includes("mobitel")) detectedCarrier = "Mobitel";
+        else if (cusrName.includes("hutchison") || cusrName.includes("hutch")) detectedCarrier = "Hutch";
         else if (cusrName.includes("etisalat")) detectedCarrier = "Etisalat";
-        else if (cusrName.includes("hutch")) detectedCarrier = "Hutch";
         else detectedCarrier = "Other";
 
         return {
@@ -116,7 +119,11 @@ app.get("/api/locations", async (req, res) => {
           Number.isFinite(d.cctCoordinates?.latitude) &&
           Number.isFinite(d.cctCoordinates?.longitude);
 
-        return (hasLea || hasCct) && (!carrier || carrier === "All" || d.carrier === carrier);
+        // Carrier filter: if carrier param is set and not "All", only include matching
+        const carrierMatch =
+          !carrier || carrier === "All" || d.carrier === carrier;
+
+        return (hasLea || hasCct) && carrierMatch;
       });
 
     res.json(locations);
@@ -126,7 +133,85 @@ app.get("/api/locations", async (req, res) => {
   }
 });
 
+// Helper for carrier filtering
+function carrierMatchFn(carrier, doc) {
+  const cusrName = (doc.CUSR_NAME || "").toLowerCase().replace(/\s|-/g, "");
+  if (carrier === "Dialog") return cusrName.includes("dialog");
+  if (carrier === "Mobitel") return cusrName.includes("sltmobitel") || cusrName.includes("mobitel");
+  if (carrier === "Hutch") return cusrName.includes("hutchison") || cusrName.includes("hutch");
+  if (carrier === "Etisalat") return cusrName.includes("etisalat");
+  if (carrier === "Other") {
+    return !(
+      cusrName.includes("dialog") ||
+      cusrName.includes("sltmobitel") ||
+      cusrName.includes("mobitel") ||
+      cusrName.includes("hutchison") ||
+      cusrName.includes("hutch") ||
+      cusrName.includes("etisalat")
+    );
+  }
+  return true; // For "All"
+}
 
+// Generic function for carrier endpoints
+async function getCarrierLocations(req, res, carrier) {
+  try {
+    const { north, south, east, west } = req.query;
+    const collection = mongoose.connection.db.collection(COLLECTION_NAME);
+
+    const query = {};
+    if (north && south && east && west) {
+      query.$or = [
+        {
+          "CEA Node- latitude": { $gte: parseFloat(south), $lte: parseFloat(north) },
+          "CEA Node- longitude": { $gte: parseFloat(west), $lte: parseFloat(east) },
+        },
+        {
+          latitude: { $gte: parseFloat(south), $lte: parseFloat(north) },
+          longitude: { $gte: parseFloat(west), $lte: parseFloat(east) },
+        },
+      ];
+    }
+
+    // Limit results for performance
+    const rawDocs = await collection.find(query).limit(MAX_LOCATIONS).toArray();
+
+    const locations = rawDocs
+      .filter((doc) => carrierMatchFn(carrier, doc))
+      .map((doc) => ({
+        _id: doc._id,
+        cct: doc.CCT ?? "",
+        service: doc.SERVICE ?? "",
+        customer: doc.CUSR_NAME ?? "",
+        address: doc.BENDADDRESS ?? "",
+        status: doc.CIRT_STATUS ?? "",
+        leaCoordinates: {
+          latitude: parseFloat(doc["CEA Node- latitude"]),
+          longitude: parseFloat(doc["CEA Node- longitude"]),
+        },
+        cctCoordinates: {
+          latitude: parseFloat(doc.latitude),
+          longitude: parseFloat(doc.longitude),
+        },
+        carrier,
+      }))
+      .filter((d) =>
+        (Number.isFinite(d.leaCoordinates?.latitude) && Number.isFinite(d.leaCoordinates?.longitude)) ||
+        (Number.isFinite(d.cctCoordinates?.latitude) && Number.isFinite(d.cctCoordinates?.longitude))
+      );
+
+    res.json(locations);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch locations" });
+  }
+}
+
+// Endpoints for each carrier
+app.get("/api/locations/dialog", (req, res) => getCarrierLocations(req, res, "Dialog"));
+app.get("/api/locations/mobitel", (req, res) => getCarrierLocations(req, res, "Mobitel"));
+app.get("/api/locations/hutch", (req, res) => getCarrierLocations(req, res, "Hutch"));
+app.get("/api/locations/etisalat", (req, res) => getCarrierLocations(req, res, "Etisalat"));
+app.get("/api/locations/other", (req, res) => getCarrierLocations(req, res, "Other"));
 
 // ---------------- ⚡ Utility APIs ----------------
 

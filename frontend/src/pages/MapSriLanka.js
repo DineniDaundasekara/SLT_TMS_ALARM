@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Box, Typography, Button, Dialog, DialogActions, DialogContent, DialogTitle } from "@mui/material";
+import { Box, Typography, Button, Dialog, DialogActions, DialogContent, DialogTitle, Select, MenuItem, FormControl, InputLabel, Card, CardContent, CardHeader, Chip, IconButton } from "@mui/material";
+import CloseIcon from '@mui/icons-material/Close';
 
 // Helper: detect carrier name
 function getCarrierByCustomerName(customerName) {
@@ -14,7 +15,127 @@ function getCarrierByCustomerName(customerName) {
 }
 
 // Carrier colors (unified)
-const colorHexByCarrier = () => "#2f4f4f";
+const colorHexByCarrier = (carrier) => {
+  if (carrier === "Mobitel") return "#00008B"; // light blue
+  if (carrier === "Hutch") return "#8B4000";   // light green
+  if (carrier === "Dialog") return "#9400D3";  // light orange
+  return "#2f4f4f";
+};
+
+const CARRIER_OPTIONS = [
+  { label: "All", value: "" },
+  { label: "Dialog", value: "Dialog" },
+  { label: "Mobitel", value: "Mobitel" },
+  { label: "Hutch", value: "Hutch" },
+  { label: "Etisalat", value: "Etisalat" },
+  { label: "Other", value: "Other" },
+];
+
+// Customer Data Card Component
+const CustomerDataCard = ({ data, onClose }) => {
+  if (!data) return null;
+
+  const getStatusColor = (status) => {
+    if (!status) return "default";
+    const statusLower = status.toLowerCase();
+    if (statusLower.includes("active") || statusLower.includes("online")) return "success";
+    if (statusLower.includes("inactive") || statusLower.includes("offline")) return "error";
+    if (statusLower.includes("pending") || statusLower.includes("waiting")) return "warning";
+    return "default";
+  };
+
+  return (
+    <Card 
+      sx={{ 
+        position: 'fixed', 
+        top: 20, 
+        left: 20, 
+        width: 350, 
+        zIndex: 1000,
+        boxShadow: 3,
+        borderRadius: 2
+      }}
+    >
+      <CardHeader
+        title={
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6" component="div">
+              CCT Details
+            </Typography>
+            <IconButton onClick={onClose} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        }
+        sx={{ pb: 1 }}
+      />
+      <CardContent sx={{ pt: 0 }}>
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            CCT ID
+          </Typography>
+          <Typography variant="h6" sx={{ fontWeight: 'bold', color: '#1976d2' }}>
+            {data.cct || "N/A"}
+          </Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Customer
+          </Typography>
+          <Typography variant="body1">
+            {data.customer || "N/A"}
+          </Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Service
+          </Typography>
+          <Typography variant="body1">
+            {data.service || "N/A"}
+          </Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Address
+          </Typography>
+          <Typography variant="body2" sx={{ wordBreak: 'break-word' }}>
+            {data.address || "N/A"}
+          </Typography>
+        </Box>
+
+        <Box sx={{ mb: 2 }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Status
+          </Typography>
+          <Chip 
+            label={data.status || "N/A"} 
+            color={getStatusColor(data.status)}
+            size="small"
+            variant="outlined"
+          />
+        </Box>
+
+        <Box sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+            Carrier
+          </Typography>
+          <Chip 
+            label={data.carrier || "Other"} 
+            sx={{ 
+              backgroundColor: colorHexByCarrier(data.carrier),
+              color: 'white',
+              fontWeight: 'bold'
+            }}
+            size="small"
+          />
+        </Box>
+      </CardContent>
+    </Card>
+  );
+};
 
 const MapSriLanka = () => {
   const mapRef = useRef(null);
@@ -22,6 +143,10 @@ const MapSriLanka = () => {
   const [map, setMap] = useState(null);
   const [locations, setLocations] = useState([]);
   const [openDetails, setOpenDetails] = useState(false);
+  const [selectedCarrier, setSelectedCarrier] = useState("");
+  const [selectedCctData, setSelectedCctData] = useState(null);
+  const [showCctCard, setShowCctCard] = useState(false);
+  const [showConnections, setShowConnections] = useState(true);
 
   // ✅ Get API key
   useEffect(() => {
@@ -49,9 +174,19 @@ const MapSriLanka = () => {
     return () => document.body.removeChild(script);
   }, [apiKey]);
 
-  // ✅ Load locations within map bounds
+  // ✅ Load locations within map bounds and carrier
   useEffect(() => {
     if (!map) return;
+    // 🚫 Do not load any data until a carrier is selected
+    if (!selectedCarrier) {
+      setLocations([]);
+      // Optionally, clear markers from map
+      if (map.markers) {
+        map.markers.forEach((m) => m.setMap(null));
+        map.markers = [];
+      }
+      return;
+    }
 
     const loadLocations = async () => {
       try {
@@ -68,7 +203,12 @@ const MapSriLanka = () => {
           west: southWest.lng(),
         });
 
-        const res = await fetch(`/api/locations?${query.toString()}`);
+        let url = "/api/locations";
+        if (selectedCarrier && selectedCarrier !== "") {
+          url += "/" + selectedCarrier.toLowerCase();
+        }
+
+        const res = await fetch(`${url}?${query.toString()}`);
         if (!res.ok) throw new Error("Failed to fetch locations");
         const data = await res.json();
         setLocations(data);
@@ -85,18 +225,28 @@ const MapSriLanka = () => {
     return () => {
       if (listener) window.google.maps.event.removeListener(listener);
     };
-  }, [map]);
+  }, [map, selectedCarrier]);
 
-  // ✅ Place individual markers (no clustering)
+  // ✅ Place individual markers and connection lines
   useEffect(() => {
     if (!map || locations.length === 0) return;
 
-    // Clear existing markers
+    // Clear existing markers and polylines
     map.markers?.forEach((m) => m.setMap(null));
     map.markers = [];
+    
+    if (map.polylines) {
+      map.polylines.forEach((p) => p.setMap(null));
+      map.polylines = [];
+    } else {
+      map.polylines = [];
+    }
 
+    // Group locations by CEA coordinates to connect CCTs to their CEA
+    const ceaGroups = new Map();
+    
     locations.forEach((loc) => {
-      // LEA marker
+      // CEA marker
       if (
         Number.isFinite(loc.leaCoordinates?.latitude) &&
         Number.isFinite(loc.leaCoordinates?.longitude)
@@ -108,21 +258,21 @@ const MapSriLanka = () => {
             lng: loc.leaCoordinates.longitude,
           },
           map,
-          title: `LEA - ${loc.cct || "Unknown"}`,
+          title: `CEA - ${loc.cct || "Unknown"}`,
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 6,
-            fillColor,
+            scale: 8,
+            fillColor: fillColor,
             fillOpacity: 1,
             strokeColor: "#ffffff",
-            strokeWeight: 1,
+            strokeWeight: 2,
           },
         });
 
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
             <div style="padding:10px;">
-              <p><b>LEA Location</b></p>
+              <p><b>CEA Location</b></p>
               <p><b>CCT:</b> ${loc.cct || "-"}</p>
               <p><b>Service:</b> ${loc.service || "-"}</p>
               <p><b>Customer:</b> ${loc.customer || "-"}</p>
@@ -133,6 +283,19 @@ const MapSriLanka = () => {
         });
         leaMarker.addListener("click", () => infoWindow.open(map, leaMarker));
         map.markers.push(leaMarker);
+
+        // Store CEA position for grouping
+        const ceaKey = `${loc.leaCoordinates.latitude},${loc.leaCoordinates.longitude}`;
+        if (!ceaGroups.has(ceaKey)) {
+          ceaGroups.set(ceaKey, {
+            ceaPosition: {
+              lat: loc.leaCoordinates.latitude,
+              lng: loc.leaCoordinates.longitude,
+            },
+            carrier: loc.carrier,
+            ccts: []
+          });
+        }
       }
 
       // CCT marker
@@ -150,35 +313,63 @@ const MapSriLanka = () => {
           icon: {
             path: window.google.maps.SymbolPath.CIRCLE,
             scale: 6,
-            fillColor: "#800080", // purple
+            fillColor: "#444444",
             fillOpacity: 1,
             strokeColor: "#ffffff",
             strokeWeight: 1,
           },
         });
 
-        const infoWindow = new window.google.maps.InfoWindow({
-          content: `
-            <div style="padding:10px;">
-              <p><b>CCT Location</b></p>
-              <p><b>CCT:</b> ${loc.cct || "-"}</p>
-              <p><b>Service:</b> ${loc.service || "-"}</p>
-              <p><b>Customer:</b> ${loc.customer || "-"}</p>
-              <p><b>Address:</b> ${loc.address || "-"}</p>
-              <p><b>Status:</b> ${loc.status || "-"}</p>
-            </div>
-          `,
+        cctMarker.addListener("click", () => {
+          setSelectedCctData(loc);
+          setShowCctCard(true);
         });
-        cctMarker.addListener("click", () => infoWindow.open(map, cctMarker));
         map.markers.push(cctMarker);
+
+        // Add CCT to the nearest CEA group
+        const ceaKey = `${loc.leaCoordinates.latitude},${loc.leaCoordinates.longitude}`;
+        if (ceaGroups.has(ceaKey)) {
+          ceaGroups.get(ceaKey).ccts.push({
+            position: {
+              lat: loc.cctCoordinates.latitude,
+              lng: loc.cctCoordinates.longitude,
+            },
+            cct: loc.cct
+          });
+        }
       }
     });
-  }, [map, locations]);
+
+    // Draw connection lines if enabled
+    if (showConnections) {
+      ceaGroups.forEach((group) => {
+        group.ccts.forEach((cct) => {
+          const polyline = new window.google.maps.Polyline({
+            path: [group.ceaPosition, cct.position],
+            geodesic: true,
+            strokeColor: colorHexByCarrier(group.carrier),
+            strokeOpacity: 0.7,
+            strokeWeight: 2,
+          });
+          polyline.setMap(map);
+          map.polylines.push(polyline);
+        });
+      });
+    }
+  }, [map, locations, showConnections]);
 
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
       {/* Map */}
       <Box ref={mapRef} sx={{ flex: 2, borderRadius: 2, overflow: "hidden" }} />
+
+      {/* Customer Data Card */}
+      {showCctCard && (
+        <CustomerDataCard 
+          data={selectedCctData} 
+          onClose={() => setShowCctCard(false)} 
+        />
+      )}
 
       {/* Sidebar */}
       <Box
@@ -192,7 +383,22 @@ const MapSriLanka = () => {
           overflowY: "auto",
         }}
       >
-        {/* Filter removed as all carriers use same color */}
+        {/* Carrier Dropdown */}
+        <FormControl fullWidth sx={{ mb: 2 }}>
+          <InputLabel id="carrier-select-label">Carrier</InputLabel>
+          <Select
+            labelId="carrier-select-label"
+            value={selectedCarrier}
+            label="Carrier"
+            onChange={(e) => setSelectedCarrier(e.target.value)}
+          >
+            {CARRIER_OPTIONS.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
 
         <Button
           variant="contained"
@@ -202,9 +408,98 @@ const MapSriLanka = () => {
           View Alarm Location Details
         </Button>
 
+        <Button
+          variant={showConnections ? "contained" : "outlined"}
+          onClick={() => setShowConnections(!showConnections)}
+          sx={{ mb: 2, ml: 1 }}
+        >
+          {showConnections ? "Hide" : "Show"} Connections
+        </Button>
+
         <Typography variant="h6" gutterBottom>
           Locations in View: {locations.length}
         </Typography>
+
+        {/* Legend */}
+        <Box sx={{ mb: 2, p: 2, border: "1px solid #ddd", borderRadius: 1,color:"#444444" }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Customer Distribution
+          </Typography>
+          {selectedCarrier ? (
+            <>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1 ,color:"#444444", }}>
+                <Box
+                  sx={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    backgroundColor: colorHexByCarrier(selectedCarrier),
+                    mr: 1,
+                    border: "2px solid #ffffff",
+                  }}
+                />
+                <Typography variant="caption">CEA Node ({selectedCarrier})</Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1,color:"#444444" }}>
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    backgroundColor: "#444444",
+                    mr: 1,
+                    border: "1px solid #ffffff",
+                  }}
+                />
+                <Typography variant="caption">CCT Location</Typography>
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", mb: 1,color:"#444444" }}>
+                <Box
+                  sx={{
+                    width: 20,
+                    height: 2,
+                    
+                    backgroundColor: colorHexByCarrier(selectedCarrier),
+                    mr: 1,
+                  }}
+                />
+                <Typography variant="caption">Connection Line</Typography>
+              </Box>
+            </>
+          ) : (
+            <>
+              {["Dialog", "Mobitel", "Hutch", "Etisalat", "Other"].map((c) => (
+                <Box key={c} sx={{ display: "flex", alignItems: "center", mb: 1 }}>
+                  <Box
+                    sx={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      backgroundColor: colorHexByCarrier(c),
+                      mr: 1,
+                      border: "2px solid #ffffff",
+                    }}
+                  />
+                  <Box sx={{ width: 20, height: 2, backgroundColor: colorHexByCarrier(c), mr: 1 }} />
+                  <Typography variant="caption">CEA & Line - {c}</Typography>
+                </Box>
+              ))}
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    backgroundColor: "#444444",
+                    mr: 1,
+                    border: "1px solid #ffffff",
+                  }}
+                />
+                <Typography variant="caption">CCT Location</Typography>
+              </Box>
+            </>
+          )}
+        </Box>
 
         {locations.length === 0 ? (
           <Typography variant="body2" color="text.secondary">
