@@ -119,7 +119,7 @@ const MapSriLanka = () => {
 
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
-            <div style="padding:10px;">
+            <div style="padding:10px; background-color: black; color: white;">
               <p><b>LEA Location</b></p>
               <p><b>CCT:</b> ${loc.cct || "-"}</p>
               <p><b>Service:</b> ${loc.service || "-"}</p>
@@ -159,7 +159,7 @@ const MapSriLanka = () => {
 
         const infoWindow = new window.google.maps.InfoWindow({
           content: `
-            <div style="padding:10px;">
+            <div style="padding:10px; background-color: black; color: white;">
               <p><b>CCT Location</b></p>
               <p><b>CCT:</b> ${loc.cct || "-"}</p>
               <p><b>Service:</b> ${loc.service || "-"}</p>
@@ -303,12 +303,19 @@ const MapSriLanka = () => {
           maxWidth="md"
           fullWidth
         >
-          <DialogTitle>All Location Details</DialogTitle>
-          <DialogContent>
+          <DialogTitle sx={{ backgroundColor: "#333", color: "#000000ff" }}>
+            All Location Details
+          </DialogTitle>
+          <DialogContent sx={{ backgroundColor: "#333", color: "#000000ff" }}>
             {locations.map((loc, index) => (
               <Box
                 key={index}
-                sx={{ mb: 2, p: 1, border: "1px solid #ddd", borderRadius: 1 }}
+                sx={{
+                  mb: 2,
+                  p: 1,
+                  border: "1px solid #0c0b0bff",
+                  borderRadius: 1,
+                }}
               >
                 <Typography variant="h6">{loc.cct}</Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -326,7 +333,7 @@ const MapSriLanka = () => {
               </Box>
             ))}
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={{ backgroundColor: "#333", color: "#020202ff" }}>
             <Button onClick={() => setOpenDetails(false)} color="primary">
               Close
             </Button>
