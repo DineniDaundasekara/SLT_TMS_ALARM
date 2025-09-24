@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Box, Typography, Button, Dialog, DialogActions, DialogContent, DialogTitle, Select, MenuItem, FormControl, InputLabel, Card, CardContent, CardHeader, Chip, IconButton } from "@mui/material";
+import { Box, Typography, Button, Dialog, DialogActions, DialogContent, DialogTitle, Select, MenuItem, FormControl, InputLabel, Card, CardContent, CardHeader, Chip, IconButton, TextField } from "@mui/material";
 import CloseIcon from '@mui/icons-material/Close';
 
 // Helper: detect carrier name
@@ -147,6 +147,8 @@ const MapSriLanka = () => {
   const [selectedCctData, setSelectedCctData] = useState(null);
   const [showCctCard, setShowCctCard] = useState(false);
   const [showConnections, setShowConnections] = useState(true);
+  const [searchCct, setSearchCct] = useState("");
+  const [searchError, setSearchError] = useState("");
 
   // ✅ Get API key
   useEffect(() => {
@@ -358,6 +360,26 @@ const MapSriLanka = () => {
     }
   }, [map, locations, showConnections]);
 
+  // Helper: Zoom to CCT
+  const handleSearchCct = () => {
+    setSearchError("");
+    if (!searchCct.trim()) return;
+    const found = locations.find(
+      (loc) => String(loc.cct).toLowerCase() === searchCct.trim().toLowerCase()
+    );
+    if (found && map && found.cctCoordinates?.latitude && found.cctCoordinates?.longitude) {
+      map.setZoom(15);
+      map.panTo({
+        lat: found.cctCoordinates.latitude,
+        lng: found.cctCoordinates.longitude,
+      });
+      setSelectedCctData(found);
+      setShowCctCard(true);
+    } else {
+      setSearchError("CCT not found in current view/filter.");
+    }
+  };
+
   return (
     <Box sx={{ display: "flex", height: "100%" }}>
       {/* Map */}
@@ -383,6 +405,26 @@ const MapSriLanka = () => {
           overflowY: "auto",
         }}
       >
+        {/* --- CCT Search Bar --- */}
+        <Box sx={{ mb: 2, display: "flex", gap: 1 }}>
+          <TextField
+            label="Search CCT ID"
+            size="small"
+            value={searchCct}
+            onChange={(e) => setSearchCct(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSearchCct(); }}
+            fullWidth
+          />
+          <Button variant="contained" onClick={handleSearchCct}>
+            Search
+          </Button>
+        </Box>
+        {searchError && (
+          <Typography color="error" variant="caption" sx={{ mb: 1, display: "block" }}>
+            {searchError}
+          </Typography>
+        )}
+
         {/* Carrier Dropdown */}
         <FormControl fullWidth sx={{ mb: 2 }}>
           <InputLabel id="carrier-select-label">Carrier</InputLabel>
