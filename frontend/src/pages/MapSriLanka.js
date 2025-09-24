@@ -629,4 +629,3 @@ const MapSriLanka = () => {
 };
 
 export default MapSriLanka;
- 
